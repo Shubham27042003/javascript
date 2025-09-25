@@ -1,0 +1,57 @@
+-- Mongo db
+
+
+test> db.createCollection('payments');
+{ ok: 1 }
+
+db.payments.insertMany([{orderId:1,amount:3545,method:'UPI',paidAt:ISODate('2025-09-01T11:00:00Z')},
+{orderId:2,amount:13498,method:'CARD',paidAt:ISODate('2025-09-02T13:00:00Z')},
+{orderId:4,amount:6597,method:'COD',paidAt:ISODate('2025-09-05T15:00:00Z')}]);
+
+
+	{
+	  acknowledged: true,
+	  insertedIds: {
+	    '0': ObjectId('68d4e063b5c6efcb89ce5f47'),
+	    '1': ObjectId('68d4e063b5c6efcb89ce5f48'),
+	    '2': ObjectId('68d4e063b5c6efcb89ce5f49')
+	  }
+	}
+	
+Q1.
+db.payments.find({method:'CARD'},{});
+->>
+	[
+	  {
+	    _id: ObjectId('68d4e063b5c6efcb89ce5f48'),
+	    orderId: 2,
+	    amount: 13498,
+	    method: 'CARD',
+	    paidAt: ISODate('2025-09-02T13:00:00.000Z')
+	  }
+	]
+
+Q2.
+db.payments.find({amount:{$gt:5000}},{});
+->>
+
+	[
+	  {
+	    _id: ObjectId('68d4e063b5c6efcb89ce5f48'),
+	    orderId: 2,
+	    amount: 13498,
+	    method: 'CARD',
+	    paidAt: ISODate('2025-09-02T13:00:00.000Z')
+	  },
+	  {
+	    _id: ObjectId('68d4e063b5c6efcb89ce5f49'),
+	    orderId: 4,
+	    amount: 6597,
+	    method: 'COD',
+	    paidAt: ISODate('2025-09-05T15:00:00.000Z')
+	  }
+	]
+
+
+
+nakadeuttam66@gmail.com

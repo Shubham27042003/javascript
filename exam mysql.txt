@@ -1,0 +1,297 @@
+ --MYSQL
+ 
+ 1.each customer latest order date
+->> 
+	select c.name, max(o.order_date)'latest order'
+	from customers c
+	join orders o ON c.customer_id = o.customer_id
+	group by c.name;
+
+	+--------------+---------------------+
+	| name         | latest order        |
+	+--------------+---------------------+
+	| Aarav Sharma | 2025-09-25 09:25:53 |
+	| Isha Patel   | 2025-09-02 12:30:00 |
+	| Rohan Mehta  | 2025-09-03 09:45:00 |
+	| Sara Khan    | 2025-09-05 14:20:00 |
+	| Vikram Rao   | 2025-09-06 16:10:00 |
+	+--------------+---------------------+
+	5 rows in set (0.000 sec)
+
+ 2.list all prod with a price band label('low','Mid','high,'premium')
+ ->>
+	 select name,price,CASE
+		when price <= 500 then 'Low'
+		when price > 500 and price <= 1500 then 'Mid'
+		when price > 1500 and price <= 3000 then 'High'
+		else 'Premium'
+	    end as 'Price Band'
+	from products;
+
+	+---------------------+---------+------------+
+	| name                | price   | Price Band |
+	+---------------------+---------+------------+
+	| Wireless Mouse      |  899.00 | Mid        |
+	| Mechanical Keyboard | 3499.00 | Premium    |
+	| Office Chair        | 5999.00 | Premium    |
+	| Coffee Mug          |  249.00 | Low        |
+	| Notebook Pack       |  199.00 | Low        |
+	| LED Monitor 24"     | 9999.00 | Premium    |
+	| Phone Stand         |  299.00 | Low        |
+	| USB-C Cable         |  399.00 | Low        |
+	+---------------------+---------+------------+
+	8 rows in set (0.000 sec)
+
+
+ 
+ 3.for each order show the no itemr and distinct products;
+ ->>
+ 
+	 select order_id,sum(quantity)'no. of items',
+	    count(distinct product_id)'distinct products'
+	from order_items
+	group by order_id;
+	 
+	+----------+--------------+-------------------+
+	| order_id | no. of items | distinct products |
+	+----------+--------------+-------------------+
+	|        1 |            5 |                 2 |
+	|        2 |            2 |                 2 |
+	|        3 |            7 |                 2 |
+	|        4 |            3 |                 2 |
+	|        5 |            4 |                 1 |
+	|        6 |            5 |                 2 |
+	+----------+--------------+-------------------+
+	6 rows in set (0.000 sec)
+
+ 4.show avg no of units per order
+ ->>
+ 
+	select avg(sum)'avg unit'
+	from (
+	    select sum(quantity)'sum'
+	    from order_items
+	    group by order_id
+	)abc;
+
+	+----------+
+	| avg unit |
+	+----------+
+	|   4.3333 |
+	+----------+
+	1 row in set (0.000 sec)
+
+ 
+ 5.list all customer who never place an oder
+ ->>
+ 
+	select name from customers
+	where customer_id not in (select distinct customer_id from orders);
+
+	Empty set (0.008 sec)
+
+ 
+ 6.show customer who paid via upi
+ ->>
+ 
+	select c.name from customers c
+	join orders o on c.customer_id = o.customer_id
+	join payments p on o.order_id = p.order_id
+	where p.method = 'upi';
+
+	+--------------+
+	| name         |
+	+--------------+
+	| Aarav Sharma |
+	+--------------+
+	1 row in set (0.000 sec)
+
+ 
+7.list all pending order older than 7 days
+->>
+	select order_id, order_date from orders
+	where status = 'pending' and datediff(current_timestamp, order_date) > 7;
+
+	+----------+---------------------+
+	| order_id | order_date          |
+	+----------+---------------------+
+	|        3 | 2025-09-03 09:45:00 |
+	+----------+---------------------+
+	1 row in set (0.000 sec)
+
+
+ 8. find high stock(>100) but low sales(<10units)
+ 
+ ->>
+	select p.name, p.stock, sum(oi.quantity)'total_sold'
+	from products p
+	left join order_items oi on p.product_id = oi.product_id
+	group by p.product_id, p.name, p.stock
+	having p.stock > 100 and total_sold < 10;
+	 
+	+---------------+-------+------------+
+	| name          | stock | total_sold |
+	+---------------+-------+------------+
+	| Coffee Mug    |   200 |          7 |
+	| Notebook Pack |   300 |          7 |
+	| Phone Stand   |   120 |          2 |
+	| USB-C Cable   |   150 |          2 |
+	+---------------+-------+------------+
+	4 rows in set (0.000 sec)
+
+
+ 9. show approx profit margin 30% for each order
+ ->>
+ 
+	 select order_id,total_amount,total_amount * 0.30 as 'aprox profit'
+	 from orders;
+	 
+	 +----------+--------------+--------------+
+	| order_id | total_amount | aprox profit |
+	+----------+--------------+--------------+
+	|        1 |      2545.00 |     763.5000 |
+	|        2 |     13498.00 |    4049.4000 |
+	|        3 |      1793.00 |     537.9000 |
+	|        4 |      6597.00 |    1979.1000 |
+	|        5 |       996.00 |     298.8000 |
+	|        6 |      2100.00 |     630.0000 |
+	+----------+--------------+--------------+
+	6 rows in set (0.000 sec)
+
+ 
+ 10. find orders where payment cover the total but status is not PAID
+->>
+	select o.order_id, o.status, o.total_amount, p.amount paid
+	from orders o join payments p on o.order_id = p.order_id
+	where o.status != 'PAID' AND o.total_amount <= p.amount;
+	 
+	Empty set (0.000 sec)
+
+ -------------------------------------------------------------
+ Q.2 return remaining balance which is never less than zero
+ 
+	delimiter //
+	drop function if exists fn_order_balance;
+	create function fn_order_balance(n int) returns decimal(7,2)
+	begin
+		declare a decimal(7,2);
+		declare b decimal(7,2);
+		declare c decimal(7,2);
+		
+		select total_amount into a
+		from orders o
+		where o.order_id=n;
+		
+		select ifnull(sum(amount),0) into b
+		from payments p
+		where p.order_id=n;
+		
+		set c =a-b;
+		
+		if c<0
+		then
+			return 0;
+		else
+			return c;
+		end if;
+		
+	end //
+	delimiter ;
+
+	select fn_order_balance(1);
+	select fn_order_balance(5);
+
+	MariaDB [ecommerce_exam]> select fn_order_balance(1);
+	+---------------------+
+	| fn_order_balance(1) |
+	+---------------------+
+	|                0.00 |
+	+---------------------+
+	1 row in set (0.000 sec)
+
+	MariaDB [ecommerce_exam]> select fn_order_balance(5);
+	+---------------------+
+	| fn_order_balance(5) |
+	+---------------------+
+	|              996.00 |
+	+---------------------+
+	1 row in set (0.000 sec)
+
+
+--------------------------------------
+Q.3
+consider a prodcuts table
+write a trigger if any record is deleted from order table make a xopy of same entry into product_backup  table
+crete products_backup same as product table
+-->>
+MariaDB [ecommerce_exam]> desc order1;;
++--------------+----------------------------------------------+------+-----+---------------------+-------+
+| Field        | Type                                         | Null | Key | Default             | Extra |
++--------------+----------------------------------------------+------+-----+---------------------+-------+
+| order_id     | int(11)                                      | NO   |     | 0                   |       |
+| customer_id  | int(11)                                      | NO   |     | NULL                |       |
+| order_date   | timestamp                                    | NO   |     | current_timestamp() |       |
+| status       | enum('PENDING','PAID','SHIPPED','CANCELLED') | YES  |     | PENDING             |       |
+| total_amount | decimal(12,2)                                | YES  |     | 0.00                |       |
++--------------+----------------------------------------------+------+-----+---------------------+-------+
+5 rows in set (0.001 sec)
+
+
+MariaDB [ecommerce_exam]> create table order1_backup  as select * from order1 where 2=3;
+Query OK, 0 rows affected (0.095 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+
+MariaDB [ecommerce_exam]> desc order1_backup;
++--------------+----------------------------------------------+------+-----+---------------------+-------+
+| Field        | Type                                         | Null | Key | Default             | Extra |
++--------------+----------------------------------------------+------+-----+---------------------+-------+
+| order_id     | int(11)                                      | NO   |     | 0                   |       |
+| customer_id  | int(11)                                      | NO   |     | NULL                |       |
+| order_date   | timestamp                                    | NO   |     | current_timestamp() |       |
+| status       | enum('PENDING','PAID','SHIPPED','CANCELLED') | YES  |     | PENDING             |       |
+| total_amount | decimal(12,2)                                | YES  |     | 0.00                |       |
++--------------+----------------------------------------------+------+-----+---------------------+-------+
+5 rows in set (0.000 sec)
+
+
+
+MariaDB [ecommerce_exam]> select * from order1_backup;
+Empty set (0.000 sec)
+
+
+
+	
+---trigger
+
+delimiter //
+drop trigger if exists del_backup;
+create trigger del_backup
+before delete 
+on order1
+for each row
+
+begin
+	insert into order1_backup values(old.order_id,old.customer_id,old.order_date,old.status,old.total_amount);
+end//
+delimiter ;
+
+Query OK, 0 rows affected (0.039 sec)
+
+Query OK, 0 rows affected (0.139 sec)
+
+MariaDB [ecommerce_exam]> delete from order1 where order_id=3;
+Query OK, 1 row affected (0.009 sec)
+
+MariaDB [ecommerce_exam]> select * from order1_backup;
++----------+-------------+---------------------+---------+--------------+
+| order_id | customer_id | order_date          | status  | total_amount |
++----------+-------------+---------------------+---------+--------------+
+|        3 |           3 | 2025-09-03 09:45:00 | PENDING |      1793.00 |
++----------+-------------+---------------------+---------+--------------+
+1 row in set (0.000 sec)
+
+
+
+
+ 
